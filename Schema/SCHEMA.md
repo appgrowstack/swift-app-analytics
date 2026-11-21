@@ -230,6 +230,14 @@ events:
 **アプリの Swift の型に出さず**、`--json` と `--ts` にだけ載る。送る口を 1 つにして、2 か所から撃てないようにする。
 `audit` もこの出来事を数えない。`sent_by` は共通カタログにだけ書ける。
 
+### sent_by: sdk
+
+共通カタログの `campaign_*`・`campaigns_stale`・`app_updated`・`link_opened` は、キャンペーンの SDK（swift-app-campaign・
+kotlin-app-campaign）が作り、アプリの計測へ渡す（`CampaignEngine(record:)`）。アプリは受けた名前と引数をそのまま封筒に載せて送る。
+`sent_by: package` と同じく **アプリの Swift の型に出さず**、`--json` と `--ts` にだけ載り、`audit` も数えない。
+アプリの `analytics.yaml` に同じ出来事を書き写さない（共通の出来事を定義し直すと落ちる）。
+値は SDK が決めるので、この出来事の enum は `extensible` にしない（アプリが値を足せない）。
+
 ### audit と共通の出来事
 
 アプリにその場面が無い共通の出来事（お知らせが無いアプリの `whats_new_*` など）は、撃っていなくても落とさず、
@@ -366,7 +374,7 @@ facts:
 | `limits` | 方言の上限。`first_party` は `value`・`name`・`dimensions`・`numbers`・`tokens`、`envelope` は `value`・`name`、`ga4` は `value`・`name`・`parameters` |
 | `includes` | 取り込んだカタログの `name` と `version` の並び。取り込んでいなければ `[]` |
 | `events[].origin` | `common`（共通カタログの出来事）か `app`（アプリの出来事） |
-| `events[].sentBy` | `package`（AnalyticsCore が送る）か `app` |
+| `events[].sentBy` | `app`（アプリが撃つ）・`package`（AnalyticsCore が送る）・`sdk`（キャンペーンの SDK が作り、アプリがそのまま流す） |
 | `events[].parameters` | **YAML に書いた順**（列の割り当てはこの順）。`key`・`origin`・`type` は必ずある。`extend:` で足した引数は `origin: app` で後ろに付く。任意の引数には `"optional": true` が付き、`props` に無くてよい |
 | `userProperties` | 属性。`token` は無い |
 | `facts` | サーバーで数えるもの。照らし合わせには使わない |

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- The common catalog (version 3) has the events the campaign SDKs make and hand to the app's analytics:
+  `campaign_eligible`, `campaign_skipped`, `campaign_rejected`, `campaigns_stale`, `campaign_shown`,
+  `campaign_tapped`, `campaign_dismissed`, `campaign_action_completed`, `app_updated` and `link_opened`.
+  Apps that include `common` drop their own copies of these events.
+- `sent_by: sdk` in the common catalog: made by another SDK and passed through by the app. Like
+  `sent_by: package`, these events are left out of the app's Swift and of `audit`, and appear in
+  `--json` (`"sentBy": "sdk"`) and `--ts`.
+
 ## [0.4.1] - 2026-11-21
 
 ### Changed

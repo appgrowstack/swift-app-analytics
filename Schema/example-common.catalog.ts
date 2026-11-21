@@ -2,7 +2,7 @@
 // 元は analytics.yaml。**先にそちらを直してから生成する。**
 
 export const CATALOG_VERSION = 1 as const;
-export const INCLUDES = [{ name: "common", version: 2 }] as const;
+export const INCLUDES = [{ name: "common", version: 3 }] as const;
 
 export const FirstOpenKind = ["fresh", "upgraded"] as const;
 export type FirstOpenKind = (typeof FirstOpenKind)[number];
@@ -40,6 +40,20 @@ export const ReviewMomentName = ["after_whats_new"] as const;
 export type ReviewMomentName = (typeof ReviewMomentName)[number];
 export const WhatsNewCloseVia = ["close_button", "finished", "swipe_down"] as const;
 export type WhatsNewCloseVia = (typeof WhatsNewCloseVia)[number];
+export const CampaignSide = ["treatment", "holdout"] as const;
+export type CampaignSide = (typeof CampaignSide)[number];
+export const CampaignSkipReason = ["busy", "lower_priority", "missing_locale", "image_not_ready", "fact_unavailable", "withdrawn"] as const;
+export type CampaignSkipReason = (typeof CampaignSkipReason)[number];
+export const CampaignRejectReason = ["parse_error", "schema_too_new", "invalid", "unknown_placement", "unknown_action", "unknown_asset", "unknown_fact", "unknown_operator", "unknown_target", "missing_value", "unknown_value", "type_mismatch"] as const;
+export type CampaignRejectReason = (typeof CampaignRejectReason)[number];
+export const CampaignTapTarget = ["action", "link"] as const;
+export type CampaignTapTarget = (typeof CampaignTapTarget)[number];
+export const CampaignDismissVia = ["secondary", "close_button", "swipe_down", "outside"] as const;
+export type CampaignDismissVia = (typeof CampaignDismissVia)[number];
+export const CampaignActionResult = ["completed", "failed", "cancelled"] as const;
+export type CampaignActionResult = (typeof CampaignActionResult)[number];
+export const LinkOpenedKind = ["short", "store_page"] as const;
+export type LinkOpenedKind = (typeof LinkOpenedKind)[number];
 
 export const EVENTS = {
   first_open: {
@@ -198,6 +212,92 @@ export const EVENTS = {
       via: { type: "enum", origin: "common", values: WhatsNewCloseVia, extensible: true },
     },
   },
+  campaign_eligible: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      side: { type: "enum", origin: "common", values: CampaignSide, extensible: false },
+    },
+  },
+  campaign_skipped: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      reason: { type: "enum", origin: "common", values: CampaignSkipReason, extensible: false },
+    },
+  },
+  campaign_rejected: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      reason: { type: "enum", origin: "common", values: CampaignRejectReason, extensible: false },
+    },
+  },
+  campaigns_stale: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      set_version: { type: "count", origin: "common" },
+      hours: { type: "count", origin: "common" },
+    },
+  },
+  campaign_shown: {
+    kind: "impression", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      placement: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+    },
+  },
+  campaign_tapped: {
+    kind: "interaction", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      target: { type: "enum", origin: "common", values: CampaignTapTarget, extensible: false },
+    },
+  },
+  campaign_dismissed: {
+    kind: "interaction", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      via: { type: "enum", origin: "common", values: CampaignDismissVia, extensible: false },
+    },
+  },
+  campaign_action_completed: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      campaign: { type: "token", origin: "common", pattern: "_set|_invalid|[a-z0-9-]{3,40}", maxLength: 64 },
+      set_version: { type: "count", origin: "common" },
+      trigger: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      action: { type: "token", origin: "common", pattern: "[a-z0-9_]{1,40}", maxLength: 64 },
+      result: { type: "enum", origin: "common", values: CampaignActionResult, extensible: false },
+    },
+  },
+  app_updated: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      from_version: { type: "token", origin: "common", pattern: "[0-9]+(\\.[0-9]+){1,2}", maxLength: 64 },
+      to_version: { type: "token", origin: "common", pattern: "[0-9]+(\\.[0-9]+){1,2}", maxLength: 64 },
+    },
+  },
+  link_opened: {
+    kind: "outcome", dedup: "always", origin: "common", sentBy: "sdk",
+    parameters: {
+      kind: { type: "enum", origin: "common", values: LinkOpenedKind, extensible: false },
+      target: { type: "token", origin: "common", optional: true, pattern: "[a-z][a-z0-9-]{1,63}", maxLength: 64 },
+      campaign: { type: "token", origin: "common", optional: true, pattern: "[a-z0-9_-]{1,64}", maxLength: 64 },
+      code: { type: "token", origin: "common", optional: true, pattern: "[A-Za-z0-9]{8}|[A-Za-z0-9]{16}|[a-z0-9][a-z0-9-]{1,39}", maxLength: 64 },
+    },
+  },
   entry_saved: {
     kind: "outcome", dedup: "always", origin: "app", sentBy: "app",
     parameters: {
@@ -210,7 +310,7 @@ export const EVENTS = {
 
 export type EventName = keyof typeof EVENTS;
 export const EVENT_NAMES = Object.keys(EVENTS) as EventName[];
-export const COMMON_EVENT_NAMES = ["first_open", "internal_device", "screen_viewed", "tapped", "onboarding_step", "onboarding_completed", "signed_in", "experiment_assigned", "paywall_shown", "paywall_loaded", "paywall_scrolled", "paywall_plan_selected", "paywall_purchase_tapped", "paywall_purchase_result", "paywall_backgrounded", "paywall_closed", "purchase_completed", "restore_completed", "review_requested", "whats_new_shown", "whats_new_closed"] as const satisfies readonly EventName[];
+export const COMMON_EVENT_NAMES = ["first_open", "internal_device", "screen_viewed", "tapped", "onboarding_step", "onboarding_completed", "signed_in", "experiment_assigned", "paywall_shown", "paywall_loaded", "paywall_scrolled", "paywall_plan_selected", "paywall_purchase_tapped", "paywall_purchase_result", "paywall_backgrounded", "paywall_closed", "purchase_completed", "restore_completed", "review_requested", "whats_new_shown", "whats_new_closed", "campaign_eligible", "campaign_skipped", "campaign_rejected", "campaigns_stale", "campaign_shown", "campaign_tapped", "campaign_dismissed", "campaign_action_completed", "app_updated", "link_opened"] as const satisfies readonly EventName[];
 export type CommonEventName = (typeof COMMON_EVENT_NAMES)[number];
 
 /** 出来事ごとの `props` の型。生成した Swift は引数を全部埋めて送る（`?` の付いた任意の引数は、値が無ければ載らない）。 */
@@ -236,5 +336,15 @@ export interface EventProps {
   review_requested: { moment: ReviewMomentName };
   whats_new_shown: { release: string };
   whats_new_closed: { release: string; page: number; pages: number; via: WhatsNewCloseVia };
+  campaign_eligible: { campaign: string; set_version: number; trigger: string; side: CampaignSide };
+  campaign_skipped: { campaign: string; set_version: number; trigger: string; reason: CampaignSkipReason };
+  campaign_rejected: { campaign: string; set_version: number; reason: CampaignRejectReason };
+  campaigns_stale: { set_version: number; hours: number };
+  campaign_shown: { campaign: string; set_version: number; trigger: string; placement: string };
+  campaign_tapped: { campaign: string; set_version: number; trigger: string; target: CampaignTapTarget };
+  campaign_dismissed: { campaign: string; set_version: number; trigger: string; via: CampaignDismissVia };
+  campaign_action_completed: { campaign: string; set_version: number; trigger: string; action: string; result: CampaignActionResult };
+  app_updated: { from_version: string; to_version: string };
+  link_opened: { kind: LinkOpenedKind; target?: string; campaign?: string; code?: string };
   entry_saved: { screen: ScreenName; words: "0" | "1_49" | "50_199" | "200_plus"; streak?: "0" | "1" | "2_9" | "10+" };
 }

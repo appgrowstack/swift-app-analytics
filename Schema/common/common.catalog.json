@@ -1,7 +1,7 @@
 {
   "format": 1,
   "generator": "swift-analytics/Scripts/analytics-gen.py",
-  "catalogVersion": 2,
+  "catalogVersion": 3,
   "dialect": "envelope",
   "limits": {
     "value": 64,
@@ -725,6 +725,378 @@
           ],
           "extensible": true,
           "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaign_eligible",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "side",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "treatment",
+            "holdout"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaign_skipped",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "reason",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "busy",
+            "lower_priority",
+            "missing_locale",
+            "image_not_ready",
+            "fact_unavailable",
+            "withdrawn"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaign_rejected",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "reason",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "parse_error",
+            "schema_too_new",
+            "invalid",
+            "unknown_placement",
+            "unknown_action",
+            "unknown_asset",
+            "unknown_fact",
+            "unknown_operator",
+            "unknown_target",
+            "missing_value",
+            "unknown_value",
+            "type_mismatch"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaigns_stale",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "hours",
+          "origin": "common",
+          "type": "count"
+        }
+      ]
+    },
+    {
+      "name": "campaign_shown",
+      "kind": "impression",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "placement",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        }
+      ]
+    },
+    {
+      "name": "campaign_tapped",
+      "kind": "interaction",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "target",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "action",
+            "link"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaign_dismissed",
+      "kind": "interaction",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "via",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "secondary",
+            "close_button",
+            "swipe_down",
+            "outside"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "campaign_action_completed",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "_set|_invalid|[a-z0-9-]{3,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "set_version",
+          "origin": "common",
+          "type": "count"
+        },
+        {
+          "key": "trigger",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "action",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_]{1,40}",
+          "maxLength": 64
+        },
+        {
+          "key": "result",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "completed",
+            "failed",
+            "cancelled"
+          ],
+          "extensible": false,
+          "appValues": []
+        }
+      ]
+    },
+    {
+      "name": "app_updated",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "from_version",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[0-9]+(\\.[0-9]+){1,2}",
+          "maxLength": 64
+        },
+        {
+          "key": "to_version",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[0-9]+(\\.[0-9]+){1,2}",
+          "maxLength": 64
+        }
+      ]
+    },
+    {
+      "name": "link_opened",
+      "kind": "outcome",
+      "dedup": "always",
+      "origin": "common",
+      "sentBy": "sdk",
+      "parameters": [
+        {
+          "key": "kind",
+          "origin": "common",
+          "type": "enum",
+          "values": [
+            "short",
+            "store_page"
+          ],
+          "extensible": false,
+          "appValues": []
+        },
+        {
+          "key": "target",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z][a-z0-9-]{1,63}",
+          "maxLength": 64,
+          "optional": true
+        },
+        {
+          "key": "campaign",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[a-z0-9_-]{1,64}",
+          "maxLength": 64,
+          "optional": true
+        },
+        {
+          "key": "code",
+          "origin": "common",
+          "type": "token",
+          "pattern": "[A-Za-z0-9]{8}|[A-Za-z0-9]{16}|[a-z0-9][a-z0-9-]{1,39}",
+          "maxLength": 64,
+          "optional": true
         }
       ]
     }

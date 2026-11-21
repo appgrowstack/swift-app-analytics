@@ -11,9 +11,11 @@
 # - `optional: true` の引数は値が無いことがある。生成物は Optional で、nil なら props に載らない
 # - 時刻・人・アプリの版などは封筒（Envelope）が持つ。出来事の引数に入れない
 # - `sent_by: package` の出来事は AnalyticsCore が自分で送る（FirstLaunch・AnalyticsInternalDevice）。
-#   アプリの生成物の Swift には出さず、--json と --ts にだけ載る
+#   `sent_by: sdk` の出来事はキャンペーンの SDK（swift-app-campaign・kotlin-app-campaign）が作ってアプリの計測に渡し、
+#   アプリはそのまま流す（campaign_*・app_updated・link_opened）。どちらもアプリの生成物の Swift には出さず、--json と --ts にだけ載る
+# - キャンペーンの出来事の enum は SDK が値を決めるので extensible にしない
 
-version: 2
+version: 3
 name: common
 dialect: envelope
 
@@ -305,3 +307,234 @@ events:
         type_name: WhatsNewCloseVia
         extensible: true
         values: [close_button, finished, swipe_down]
+
+  # ---- アプリの中のキャンペーン（swift-app-campaign・kotlin-app-campaign が作ってアプリの計測に渡す） ----
+  # 形の正は約束の schema/inapp/events.schema.json と schema/links/link.schema.json。値は型のまま送る（set_version・hours は数）
+  - name: campaign_eligible
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: 判定の holdout まで全部の条件を通った。出す側（treatment）も出さない側（holdout）も記録し、成果の比べはこの人たちで数える
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      side:
+        type: enum
+        type_name: CampaignSide
+        values: [treatment, holdout]
+        description: treatment = 出す側・holdout = 比べるために出さない側（人の id で決まり、端末に残す）
+
+  - name: campaign_skipped
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: 出す側で条件は通ったが出さなかった件と理由
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      reason:
+        type: enum
+        type_name: CampaignSkipReason
+        values: [busy, lower_priority, missing_locale, image_not_ready, fact_unavailable, withdrawn]
+
+  - name: campaign_rejected
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: 件か組を読めなかった・使えなかった（件の id・組のバージョン・理由ごとに1回）
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      reason:
+        type: enum
+        type_name: CampaignRejectReason
+        values: [parse_error, schema_too_new, invalid, unknown_placement, unknown_action, unknown_asset, unknown_fact, unknown_operator, unknown_target, missing_value, unknown_value, type_mismatch]
+
+  - name: campaigns_stale
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: 手元の組が最後に取れてから cache_hours を過ぎた（組ごとに1回）
+    parameters:
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      hours:
+        type: count
+        description: 最後に取れてからの時間
+
+  - name: campaign_shown
+    kind: impression
+    dedup: always
+    sent_by: sdk
+    description: キャンペーンの件をプレースメントに出した（system のプレースメントは動きを動かした）
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      placement:
+        type: token
+        type_name: CampaignPlacementName
+        pattern: "[a-z0-9_]{1,40}"
+        description: 出したプレースメント（review_ask・whats_new など）
+
+  - name: campaign_tapped
+    kind: interaction
+    dedup: always
+    sent_by: sdk
+    description: キャンペーンの主のボタンをタップした
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      target:
+        type: enum
+        type_name: CampaignTapTarget
+        values: [action, link]
+
+  - name: campaign_dismissed
+    kind: interaction
+    dedup: always
+    sent_by: sdk
+    description: キャンペーンを閉じた・どう閉じたか
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      via:
+        type: enum
+        type_name: CampaignDismissVia
+        values: [secondary, close_button, swipe_down, outside]
+
+  - name: campaign_action_completed
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: キャンペーンの動き（request_review など）・リンクが終わったか
+    parameters:
+      campaign:
+        type: token
+        type_name: CampaignId
+        pattern: "_set|_invalid|[a-z0-9-]{3,40}"
+        description: 件の id（組全体のときは _set・id を読めない件は _invalid）
+      set_version:
+        type: count
+        description: 配信の組のバージョン（文を変えるたびに上がる）
+      trigger:
+        type: token
+        type_name: CampaignTrigger
+        pattern: "[a-z0-9_]{1,40}"
+        description: 当たったきっかけの id（テスター用の画面から出したときは debug）
+      action:
+        type: token
+        type_name: CampaignActionName
+        pattern: "[a-z0-9_]{1,40}"
+        description: 登録した動きの名前か link
+      result:
+        type: enum
+        type_name: CampaignActionResult
+        values: [completed, failed, cancelled]
+
+  - name: app_updated
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: アプリのバージョンが上がった最初の起動（キャンペーンの SDK が出し、whats_new のきっかけにする。アプリは自分で送らない）
+    parameters:
+      from_version:
+        type: token
+        type_name: AppVersionText
+        pattern: "[0-9]+(\\.[0-9]+){1,2}"
+        description: 前に起動したバージョン
+      to_version:
+        type: token
+        type_name: AppVersionText
+        pattern: "[0-9]+(\\.[0-9]+){1,2}"
+        description: 今のバージョン
+
+  - name: link_opened
+    kind: outcome
+    dedup: always
+    sent_by: sdk
+    description: キャンペーンの SDK が製品ページを開いた（kind=store_page）。短いリンクが押されたこと（kind=short）はサーバーが数える
+    parameters:
+      kind:
+        type: enum
+        type_name: LinkOpenedKind
+        values: [short, store_page]
+      target:
+        type: token
+        type_name: LinkTarget
+        pattern: "[a-z][a-z0-9-]{1,63}"
+        optional: true
+        description: 開いた製品のプロジェクトの id（reading-memory など）
+      campaign:
+        type: token
+        type_name: LinkCampaign
+        pattern: "[a-z0-9_-]{1,64}"
+        optional: true
+        description: 開いたキャンペーンの件の id
+      code:
+        type: token
+        type_name: LinkCode
+        pattern: "[A-Za-z0-9]{8}|[A-Za-z0-9]{16}|[a-z0-9][a-z0-9-]{1,39}"
+        optional: true
+        description: 短いリンクの code（kind=short のとき）

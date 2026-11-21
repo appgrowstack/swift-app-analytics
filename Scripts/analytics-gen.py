@@ -67,8 +67,9 @@ VALUE_LIMITS = {"ga4": GA4_VALUE_LIMIT, "first_party": FIRST_PARTY_VALUE_LIMIT, 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 INCLUDABLE = {"common": PACKAGE_ROOT / "Schema" / "common" / "common.yaml"}
 
-# 共通の出来事のうち、パッケージ（AnalyticsCore）が自分で送るもの。アプリの Swift には出さない。
-SENT_BY = {"app", "package"}
+# 共通の出来事を作る所。package = AnalyticsCore が自分で送る・sdk = 計測の外の SDK（キャンペーンなど）が作り、
+# アプリが受け取ってそのまま流す。どちらもアプリが作らないので、アプリの Swift には出さない。
+SENT_BY = {"app", "package", "sdk"}
 
 KINDS = {"screen", "impression", "interaction", "outcome"}
 SCOPES = {"session", "install", "always"}
@@ -676,8 +677,8 @@ def _event(item: dict, origin: str = "app") -> Event:
     sent_by = str(item.get("sent_by", "app"))
     if sent_by not in SENT_BY:
         raise SchemaError(f"{name}: sent_by が {sorted(SENT_BY)} のどれでもない（{sent_by}）")
-    if sent_by == "package" and origin == "app":
-        raise SchemaError(f"{name}: sent_by: package は共通カタログの出来事にだけ書ける")
+    if sent_by != "app" and origin == "app":
+        raise SchemaError(f"{name}: sent_by: {sent_by} は共通カタログの出来事にだけ書ける")
     parameters = [_parameter(key, value) for key, value in (item.get("parameters") or {}).items()]
     for parameter in parameters:
         parameter.origin = origin

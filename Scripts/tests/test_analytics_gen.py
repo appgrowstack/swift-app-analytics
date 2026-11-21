@@ -416,7 +416,7 @@ class IncludeCommon(unittest.TestCase):
                 kind: outcome
                 dedup: always
         """)
-        self.assertEqual(schema.includes, [("common", 2)])
+        self.assertEqual(schema.includes, [("common", 3)])
         self.assertEqual(schema.events[0].name, "first_open")
         self.assertEqual(schema.events[-1].name, "entry_saved")
         self.assertEqual(schema.events[-1].origin, "app")
@@ -620,15 +620,24 @@ class IncludeCommon(unittest.TestCase):
         self.assertIn("first_open", names)
 
     def test_sent_by_package_only_in_common(self):
-        with self.assertRaises(gen.SchemaError):
-            load("""\
-                dialect: envelope
-                events:
-                  - name: mine
-                    kind: outcome
-                    dedup: always
-                    sent_by: package
-            """)
+        for sent_by in ("package", "sdk"):
+            with self.subTest(sent_by=sent_by), self.assertRaises(gen.SchemaError):
+                load(f"""\
+                    dialect: envelope
+                    events:
+                      - name: mine
+                        kind: outcome
+                        dedup: always
+                        sent_by: {sent_by}
+                """)
+
+    def test_sdk_events_are_in_the_catalog_but_not_in_the_app_swift(self):
+        schema = app("")
+        document = json.loads(gen.render_json(schema))
+        shown = next(e for e in document["events"] if e["name"] == "campaign_shown")
+        self.assertEqual((shown["origin"], shown["sentBy"]), ("common", "sdk"))
+        self.assertNotIn("campaignShown", gen.render(schema))
+        self.assertNotIn("campaign_shown", [e.name for e in schema.app_fired_events])
 
     def test_json_marks_origin_and_app_values(self):
         schema = app("""\
@@ -639,7 +648,7 @@ class IncludeCommon(unittest.TestCase):
                     values: [home]
         """)
         document = json.loads(gen.render_json(schema))
-        self.assertEqual(document["includes"], [{"name": "common", "version": 2}])
+        self.assertEqual(document["includes"], [{"name": "common", "version": 3}])
         viewed = next(e for e in document["events"] if e["name"] == "screen_viewed")
         self.assertEqual((viewed["origin"], viewed["sentBy"]), ("common", "app"))
         screen = viewed["parameters"][0]
@@ -663,7 +672,7 @@ class TypeScriptOutput(unittest.TestCase):
         """)
         ts = gen.render_ts(schema)
         self.assertIn("export const CATALOG_VERSION = 2 as const;", ts)
-        self.assertIn('export const INCLUDES = [{ name: "common", version: 2 }] as const;', ts)
+        self.assertIn('export const INCLUDES = [{ name: "common", version: 3 }] as const;', ts)
         self.assertIn('export const PaywallSource = ["onboarding", "settings", "limit"] as const;', ts)
         self.assertIn("export type PaywallSource = (typeof PaywallSource)[number];", ts)
         self.assertIn('entry_saved: { words: "0" | "1_49" | "50_plus"; pinned: boolean };', ts)
@@ -1035,11 +1044,18 @@ class BucketLabels(unittest.TestCase):
 class ExtensibleCommonEnums(unittest.TestCase):
 
     def test_every_common_enum_is_extensible(self):
+        """アプリが撃つ共通の出来事の enum はどれも足せる。SDK が作る出来事（sent_by: sdk）の値は SDK が決めるので閉じる。"""
+        events = gen.load(COMMON).events
         closed = {
-            p.swift_type_name for e in gen.load(COMMON).events for p in e.parameters
+            p.swift_type_name for e in events if e.sent_by != "sdk" for p in e.parameters
             if p.type == "enum" and not p.extensible
         }
         self.assertEqual(closed, set())
+        opened = {
+            p.swift_type_name for e in events if e.sent_by == "sdk" for p in e.parameters
+            if p.type == "enum" and p.extensible
+        }
+        self.assertEqual(opened, set())
 
     def test_app_can_add_close_results(self):
         schema = app("""\
