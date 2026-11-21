@@ -1,133 +1,97 @@
-[English](./README.md) | 日本語
+# swift-app-analytics
 
-# swift-analytics
+数え方を宣言する、Swiftのアプリの計測のイベント。数え方の決まりを呼ぶ場所ごとでなく、イベントの定義に置く。
 
-「どう数えるか」をイベントの定義自身に持たせる。数え方の規則が、呼び出し側の記憶ではなく定義の側にある。
+[English](./README.md)
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20tvOS%2017%20%7C%20watchOS%2010%20%7C%20visionOS%201-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-`swift-log` / `swift-metrics` のような診断ログではありません。「何人が、どの画面で、何をしたか」を、
-あとから分析できる形で残すためのものです。
+不具合を調べるためのログではありません。アプリの中で人が何をしたかを、後で分析できる形で記録します。
 
-計測の事故は「出ない」より**出すぎる**ほうが多く、そしてどちらもテストでもレビューでも
-ダッシュボードでも落ちません。原因は発火点を 2 箇所に書いたことではなく、
-**数え方がどこにも書かれていなかった**ので、2 箇所に書いたことを誰も間違いだと言えなかったことです。
-だから数え方を語彙に入れました。
+## 機能
 
-> 開発は非公開のモノリポでしていて、ここへは片方向にコピーするだけです。Issueは受けます。PRは受けません。
+- **数え方はカタログが持つ。** イベントごとに `kind`（`screen`・`impression`・`interaction`・`outcome`）と `dedup` の範囲（`session`・`install`・`always`）をYAMLで宣言します
+- **カタログからSwiftを作る。** `Scripts/analytics-gen.py generate` がアプリのイベントの型を書き出すので、イベントの名前の書き間違いや、宣言していないパラメーターでの送信はできません。文字列で送る方法はありません。ジェネレーターはPython 3だけで動きます
+- **重複は1か所で除く。** `DedupingAnalytics` がイベントごとに宣言した範囲を当てるので、呼ぶ側で送ったかどうかを確かめません
+- **インプレッションの定義が決まっている。** 面積の50%が1.0秒見えたら数えます。`ImpressionTracker` は時計を持たないので、シミュレーターも実際に待つことも無しに決まりをテストできます
+- **SwiftUIから送る。** `.trackScreen(_:dwell:)` と `.trackImpression(_:threshold:dwell:)`（iOS 18以降）。クライアントは `.analytics(_:)` で下のビューに渡します
+- **CIでの点検。** `analytics-gen.py audit` が、宣言したのに送っていないイベント・2か所から送っている同じイベント・カタログを通らない送信を見つけます
+- **共通のカタログ。** `Schema/common/common.yaml` に、どのアプリにもあるイベント（`first_open`・`paywall_*`・`purchase_completed` など）があります。アプリのカタログは `include: common` と書き、自分の値を `extend:` で足します
+- **受け取る側も同じカタログ。** `--json` と `--ts` で、サーバーやダッシュボードが照らし合わせるためのカタログを書き出します
+- **自分のサーバーにまとめて送る。** `AnalyticsBatchSink` はイベントをファイルに残し、決まったエンベロープでまとめて送ります。アプリは名前・URL・認可のクロージャを渡します
+- **インストールとビルドの扱いを1回で。** `InstallID`・`BuildChannel`（debug・TestFlight・App Store）・`FirstLaunch`（`first_open` を1回だけ送る）・`AnalyticsInternalDevice`（作る側の端末をマークする）
+- **覚えているオフのスイッチ。** `AnalyticsSwitch` は計測がオフの間すべてを捨て、その選択を次の起動でも保ち、送る前の物を消します
+- **送った物を見る。** `ConsoleAnalytics` は統合ログに書き、`AnalyticsLogViewer` は端末の上でログを見せます。テスト用に `AnalyticsTesting` の `RecordingAnalytics` があります
+- **外部の依存なし。** 計測サービスのSDKは入れていません。アダプターはアプリの中の小さな `AnalyticsClient` です
 
-## 特徴
-
-- **数え方をカタログが持つ。**「1 インストールに 1 回」「見えて 1 秒で 1 回」を発火点に覚えさせません
-- **カタログから Swift を生成する。** 文字列でイベントを送る口が無いので、名前の打ち間違いも、
-  宣言していない引数の混入も起きません
-- **重複の間引きは実施であって記憶ではない。** 宣言した範囲を `DedupingAnalytics` が実施し、
-  発火点は「もう撃ったか」を一切書きません
-- **「見えた」の定義が閉じている。** 面積の 50% 以上が連続して 1.0 秒。判定器は時計を持たないので、
-  シミュレータも実時間の待ちもなしにユニットテストで固定できます
-- **grep では書けない CI 監査。** 宣言だけで撃たれていない出来事・同じ発火が 2 箇所にあること・
-  カタログを迂回した文字列直書きを、すべてビルドで落とします
-- **共通のカタログと、1 つの封筒。** どのアプリにもある出来事（`first_open`・`paywall_*`・`purchase_completed`・
-  `review_requested`・`whats_new_*` など）は `Schema/common/common.yaml` が持ちます。アプリのカタログは
-  `include: common` で取り込み、自分の値は `extend:` で足します。名前を手で写しません。
-  `AnalyticsBatchSink` はどのアプリの出来事も同じ封筒（`Schema/common/ENVELOPE.md`）で送ります。
-  アプリが渡すのは URL・認証のクロージャ・アプリの名前だけです
-- **受け口も同じカタログを使う。** `--json` と `--ts` で、サーバー（Cloudflare Worker・studio）が照らし合わせ、
-  import するカタログを書き出します
-- **インストールとビルドの扱いを 1 か所に。** `InstallID`・`BuildChannel`（debug / TestFlight / App Store）・
-  `FirstLaunch`（`first_open{kind: fresh|upgraded}` を 1 回送る）・`AnalyticsInternalDevice`（作り手の端末の印を 1 回送る）
-- **覚えている止めスイッチ。** `AnalyticsSwitch` は、本人が止めている間のすべてを捨て、その選択を
-  起動をまたいで覚え、溜めた物を消します
-- **外部依存ゼロ。** SwiftPM は依存をパッケージ単位で解決するので、vendor の SDK（Firebase / PostHog）は
-  別パッケージに置いています。自前のサーバーへの送信も、URL と認証はアプリが書きます
-- **端末で読めるログ画面。** 実際に送られたものを、種別・数え方つきで、2 回出ているものには `×2` を付けて表示します
-
-## クイックスタート
-
-出来事と、その数え方を宣言します。
-
-```yaml
-# analytics.yaml
-version: 1
-dialect: envelope
-include: common             # first_open・paywall_*・review_requested など
-swift:
-  event_type: AppEvent
-
-extend:
-  - name: screen_viewed
-    parameters:
-      screen:
-        values: [home]      # extensible な共通の enum に値を足す
-
-events:
-  - name: entry_saved
-    kind: outcome           # screen | impression | interaction | outcome
-    dedup: always           # session | install | always
-    description: 日記を保存した
-```
-
-Swift を生成し、**生成物はコミットします**。計測の変更は「何を測ることにしたか」の変更であり、
-差分が唯一のレビュー材料だからです。
-
-```sh
-Scripts/analytics-gen.py generate --schema analytics.yaml --out Sources/App/Generated/AppAnalytics.swift \
-  --json server/catalog.json --ts server/catalog.ts
-```
-
-送り先は起動時に 1 回だけつなぎます。
+## はじめに
 
 ```swift
-let sink = AnalyticsBatchSink(
-    app: "kotoakari",
-    endpoint: URL(string: "https://api.example.com/v1/events")!,
-    authorize: { ["Authorization": "Bearer \(try await auth.idToken())"] }
-)
-let analytics = AnalyticsSwitch(DedupingAnalytics(sink)) { await sink.purge() }
-FirstLaunch.recordLaunch(sendingTo: analytics)
-```
-
-発火点はこれだけです。
-
-```swift
+import AnalyticsCore
 import AnalyticsSwiftUI
+import SwiftUI
 
-HomeView().trackScreen(.screenViewed(screen: .home))
+// analytics-gen.py writes this type from your catalog. Written by hand here to stay short.
+enum AppEvent: AnalyticsEvent {
+    case homeViewed
+
+    var name: String { "home_viewed" }
+    var parameters: [String: AnalyticsValue] { [:] }
+    var kind: EventKind { .screen }
+    var dedup: DedupScope { .always }
+}
+
+@main
+struct ExampleApp: App {
+    // Repeats collapse by each event's declared scope before they reach the console.
+    private let analytics = DedupingAnalytics(ConsoleAnalytics())
+
+    var body: some Scene {
+        WindowGroup {
+            Text("Home")
+                .trackScreen(AppEvent.homeViewed)
+                .analytics(analytics)
+        }
+    }
+}
 ```
+
+### appgrowstack につなぐ
+
+このパッケージは単体で使えます。appgrowstackを使うアプリでは、このパッケージでサーバーをつなぐ代わりに、
+コネクターのパッケージ [swift-appgrowstack](https://github.com/appgrowstack/swift-appgrowstack) の対応するtrait（SwiftPMのtraits）を有効にします。
 
 ## ドキュメント
 
-API リファレンスとガイド（Getting Started・Counting Rules・What Not to Send）は `Sources/*/*.docc/` の DocC にあります。Xcode の Product › Build Documentation で開けます。
+APIの説明とガイド（Getting Started・Counting Rules・What Not to Send）は、`Sources/*/*.docc` のDocCのカタログです。
+XcodeのProduct > Build Documentationで開けます。カタログのファイルの形は [Schema/SCHEMA.md](./Schema/SCHEMA.md)、
+エンベロープは [Schema/common/ENVELOPE.md](./Schema/common/ENVELOPE.md) にあります。変更は [CHANGELOG.md](./CHANGELOG.md) にあります。
 
-カタログの書式（`include` と `extend`・方言・`token` 型・`--json` と `--ts` の形を含む）は [Schema/SCHEMA.md](./Schema/SCHEMA.md) が仕様です。
-封筒は [Schema/common/ENVELOPE.md](./Schema/common/ENVELOPE.md) です。
-
-## 導入
+## 入れ方
 
 ```swift
-.package(url: "https://github.com/no-problem-dev/swift-analytics.git", .upToNextMinor(from: "0.3.0"))
+.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.0"))
+```
+
+```swift
+.product(name: "AnalyticsSwiftUI", package: "swift-app-analytics")
 ```
 
 | プロダクト | 中身 | 依存 |
 |---|---|---|
-| `AnalyticsCore` | 語彙・ポート・数え方 | なし |
-| `AnalyticsSwiftUI` | 画面から撃つ層・端末で読むログ | SwiftUI |
-| `AnalyticsBatchSink` | 端末に溜めて、固定の封筒で自前のサーバーへまとめて送る | `AnalyticsCore` |
-| `AnalyticsTesting` | テストの土台 | なし |
+| `AnalyticsCore` | イベント・クライアント・数え方・インストールとビルド | Foundation |
+| `AnalyticsSwiftUI` | ビューからの送信・端末の上のログの画面 | `AnalyticsCore`・SwiftUI |
+| `AnalyticsBatchSink` | 決まったエンベロープで自分のサーバーにまとめて送る | `AnalyticsCore` |
+| `AnalyticsTesting` | テスト用のフェイク。リリースするターゲットからはimportしない | `AnalyticsCore` |
 
-送信先のアダプタは別パッケージです（[swift-analytics-firebase](https://github.com/no-problem-dev/swift-analytics-firebase)）。
-同居させると、語彙しか使わない消費者にまで vendor の SDK が降ってきます。
-
-生成器は Python 3 だけで動きます（追加のインストールはありません）。
-
-## 動作環境
+## 動く環境
 
 - iOS 17.0+ / macOS 14.0+ / tvOS 17.0+ / watchOS 10.0+ / visionOS 1.0+
 - Swift 6.2+
-- Python 3（カタログ生成器のみ）
+- Python 3（カタログのジェネレーターだけ）
 
 ## ライセンス
 
-MIT — [LICENSE](LICENSE) を参照してください。
+MIT。[LICENSE](./LICENSE) を見てください。

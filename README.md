@@ -1,141 +1,117 @@
-English | [日本語](./README.ja.md)
+# swift-app-analytics
 
-# swift-analytics
+Analytics events for Swift apps that declare how they are counted, so the rule lives in the event's definition instead of at each call site.
 
-Analytics events for Swift apps that declare how they should be counted, so the rule lives in the event's definition instead of in whoever remembers it at the call site.
+[Japanese](./README.ja.md)
 
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-iOS%2017%20%7C%20macOS%2014%20%7C%20tvOS%2017%20%7C%20watchOS%2010%20%7C%20visionOS%201-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-This is not diagnostic logging (`swift-log` / `swift-metrics`). It records what people did, in a
-shape you can analyse later.
-
-Analytics bugs are more often "fires too much" than "does not fire", and neither is caught by types,
-tests, review, or the dashboard. The usual cause is not that a call was written in two places — it
-is that **the counting rule was written nowhere**, so nobody could call the second call site a
-mistake. This package puts the counting rule in the vocabulary.
-
-> Developed in a private monorepo and copied here one way. Issues are welcome; pull requests are
-> not accepted.
+This is not diagnostic logging. It records what people did in the app, in a shape you can analyse
+later.
 
 ## Features
 
-- **The catalog owns the counting rule.** "Once per install" and "once it has been visible for a
-  second" are declared in YAML, not remembered at the call site
-- **Swift is generated from that catalog.** There is no string-based send, so an event cannot be
-  misspelled or fired with parameters nobody declared
-- **Deduplication is enforced, not remembered.** `DedupingAnalytics` applies the declared scope;
-  call sites never ask "did I already fire this"
-- **Impressions have a definition that closes.** 50% of the area, continuously visible for 1.0
-  second, and the tracker holds no clock — so the rule is pinned in a unit test, with no simulator
-  and no real waiting
-- **A CI audit that grep cannot do.** Declared-but-never-fired events, the same firing appearing in
-  two places, and string sends that bypass the catalog all fail the build
-- **One shared catalog, one envelope.** `Schema/common/common.yaml` holds the events every app has
-  (`first_open`, `paywall_*`, `purchase_completed`, `review_requested`, `whats_new_*`, …). An app
-  catalog says `include: common` and adds its own values with `extend:` instead of copying names.
-  `AnalyticsBatchSink` sends every app's events in the same fixed envelope
-  (`Schema/common/ENVELOPE.md`); the app gives it a URL, an authorization closure, and its name
-- **The receiver gets the same catalog.** `--json` and `--ts` write the catalog for the server
-  (a Cloudflare Worker, a dashboard) to check against and import
-- **The install and the build, done once.** `InstallID`, `BuildChannel` (debug / TestFlight /
-  App Store), `FirstLaunch` (sends `first_open{kind: fresh|upgraded}` once), and `AnalyticsInternalDevice`
-  (marks the makers' own devices once)
-- **An off switch that remembers.** `AnalyticsSwitch` drops everything while the person has turned
-  measurement off, keeps that choice across launches, and erases what was buffered
-- **Zero external dependencies.** Vendor SDKs (Firebase, PostHog) live in separate packages,
-  because SwiftPM resolves dependencies per package. For your own server, the app writes the URL
-  and the authentication
-- **An on-device log viewer.** Read what was actually sent, with its kind, its counting rule, and a
-  `×2` on anything that fired twice — no Mac attached
+- **The catalog owns the counting rule.** Each event declares its `kind` (`screen`, `impression`,
+  `interaction`, `outcome`) and its `dedup` scope (`session`, `install`, `always`) in YAML
+- **Swift generated from the catalog.** `Scripts/analytics-gen.py generate` writes the app's event
+  type, so an event cannot be misspelled or sent with undeclared parameters. There is no
+  string-based send. The generator runs on Python 3 alone
+- **Deduplication enforced in one place.** `DedupingAnalytics` applies each event's declared scope,
+  so call sites never check whether they already sent it
+- **Impressions with a fixed definition.** 50% of the area, visible for 1.0 second.
+  `ImpressionTracker` holds no clock, so the rule is tested without a simulator or real waiting
+- **Firing from SwiftUI.** `.trackScreen(_:dwell:)` and `.trackImpression(_:threshold:dwell:)`
+  (iOS 18+), with the client handed down by `.analytics(_:)`
+- **A CI audit.** `analytics-gen.py audit` finds events that are declared but never sent, the same
+  event sent from two places, and sends that bypass the catalog
+- **A shared common catalog.** `Schema/common/common.yaml` holds the events every app has
+  (`first_open`, `paywall_*`, `purchase_completed`, …). An app catalog says `include: common` and
+  adds its own values with `extend:`
+- **The same catalog for the receiver.** `--json` and `--ts` write the catalog for a server or a
+  dashboard to check against
+- **Batches to your own server.** `AnalyticsBatchSink` keeps events in a file and sends them in
+  batches in a fixed envelope. The app gives it a name, a URL and an authorization closure
+- **The install and the build, done once.** `InstallID`, `BuildChannel` (debug, TestFlight, App
+  Store), `FirstLaunch` (sends `first_open` once) and `AnalyticsInternalDevice` (marks the makers'
+  own devices)
+- **An off switch that remembers.** `AnalyticsSwitch` drops everything while measurement is off,
+  keeps that choice across launches, and erases what was waiting to be sent
+- **Seeing what was sent.** `ConsoleAnalytics` writes to the unified log, `AnalyticsLogViewer` shows
+  the log on the device, and `AnalyticsTesting` has `RecordingAnalytics` for tests
+- **No external dependencies.** Vendor SDKs are not bundled; an adapter is a small
+  `AnalyticsClient` in your app
 
 ## Quick Start
 
-Declare the event, and how it is counted:
-
-```yaml
-# analytics.yaml
-version: 1
-dialect: envelope
-include: common             # first_open, paywall_*, review_requested, …
-swift:
-  event_type: AppEvent
-
-extend:
-  - name: screen_viewed
-    parameters:
-      screen:
-        values: [home]      # add values to the shared enums marked extensible
-
-events:
-  - name: entry_saved
-    kind: outcome           # screen | impression | interaction | outcome
-    dedup: always           # session | install | always
-    description: An entry was saved
-```
-
-Generate the Swift, and commit the result — a change to analytics is a change to *what you decided
-to measure*, and the diff is the only review artifact:
-
-```sh
-Scripts/analytics-gen.py generate --schema analytics.yaml --out Sources/App/Generated/AppAnalytics.swift \
-  --json server/catalog.json --ts server/catalog.ts
-```
-
-Wire the destination once, at launch:
-
 ```swift
-let sink = AnalyticsBatchSink(
-    app: "kotoakari",
-    endpoint: URL(string: "https://api.example.com/v1/events")!,
-    authorize: { ["Authorization": "Bearer \(try await auth.idToken())"] }
-)
-let analytics = AnalyticsSwitch(DedupingAnalytics(sink)) { await sink.purge() }
-FirstLaunch.recordLaunch(sendingTo: analytics)
-```
-
-Then the whole call site is one modifier:
-
-```swift
+import AnalyticsCore
 import AnalyticsSwiftUI
+import SwiftUI
 
-HomeView().trackScreen(.screenViewed(screen: .home))
+// analytics-gen.py writes this type from your catalog. Written by hand here to stay short.
+enum AppEvent: AnalyticsEvent {
+    case homeViewed
+
+    var name: String { "home_viewed" }
+    var parameters: [String: AnalyticsValue] { [:] }
+    var kind: EventKind { .screen }
+    var dedup: DedupScope { .always }
+}
+
+@main
+struct ExampleApp: App {
+    // Repeats collapse by each event's declared scope before they reach the console.
+    private let analytics = DedupingAnalytics(ConsoleAnalytics())
+
+    var body: some Scene {
+        WindowGroup {
+            Text("Home")
+                .trackScreen(AppEvent.homeViewed)
+                .analytics(analytics)
+        }
+    }
+}
 ```
+
+### Connecting to appgrowstack
+
+The package works on its own. In an app that uses appgrowstack, enable the matching trait of the
+connector package [swift-appgrowstack](https://github.com/appgrowstack/swift-appgrowstack) (SwiftPM
+traits) instead of wiring a server in this package.
 
 ## Documentation
 
-The API reference and the guides (Getting Started, Counting Rules, What Not to Send) are the DocC catalogs under `Sources/*/*.docc/`. Open them in Xcode with Product › Build Documentation.
-
-The catalog file format — including `include` / `extend`, the dialects, the `token` parameter type,
-and the shape of the `--json` and `--ts` output — is specified, in Japanese, in
-[Schema/SCHEMA.md](./Schema/SCHEMA.md). The envelope is [Schema/common/ENVELOPE.md](./Schema/common/ENVELOPE.md).
+The API reference and the guides (Getting Started, Counting Rules, What Not to Send) are the DocC
+catalogs under `Sources/*/*.docc`. Open them in Xcode with Product > Build Documentation. The
+catalog file format is [Schema/SCHEMA.md](./Schema/SCHEMA.md) (in Japanese), and the envelope is
+[Schema/common/ENVELOPE.md](./Schema/common/ENVELOPE.md). Changes are listed in
+[CHANGELOG.md](./CHANGELOG.md).
 
 ## Installation
 
 ```swift
-.package(url: "https://github.com/no-problem-dev/swift-analytics.git", .upToNextMinor(from: "0.3.0"))
+.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.0"))
+```
+
+```swift
+.product(name: "AnalyticsSwiftUI", package: "swift-app-analytics")
 ```
 
 | Product | Contents | Depends on |
 |---|---|---|
-| `AnalyticsCore` | Vocabulary, ports, counting rules | nothing |
-| `AnalyticsSwiftUI` | Firing from views, on-device log viewer | SwiftUI |
-| `AnalyticsBatchSink` | Keeps events on the device and sends them in batches, in the fixed envelope, to your own server | `AnalyticsCore` |
-| `AnalyticsTesting` | Test doubles | nothing |
-
-Vendor adapters are separate packages — see
-[swift-analytics-firebase](https://github.com/no-problem-dev/swift-analytics-firebase). Bundling one
-here would pull a vendor SDK into consumers that only use the vocabulary.
-
-The generator runs on Python 3 alone; there is nothing to install.
+| `AnalyticsCore` | Events, clients, counting rules, install and build | Foundation |
+| `AnalyticsSwiftUI` | Firing from views, the on-device log viewer | `AnalyticsCore`, SwiftUI |
+| `AnalyticsBatchSink` | Batches in the fixed envelope to your own server | `AnalyticsCore` |
+| `AnalyticsTesting` | Test doubles. Do not import it from a shipping target | `AnalyticsCore` |
 
 ## Requirements
 
 - iOS 17.0+ / macOS 14.0+ / tvOS 17.0+ / watchOS 10.0+ / visionOS 1.0+
 - Swift 6.2+
-- Python 3 (for the catalog generator only)
+- Python 3, for the catalog generator only
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](./LICENSE).
