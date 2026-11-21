@@ -8,7 +8,7 @@ import PackageDescription
 /// only use the vocabulary. Adapters live in a separate package such as `swift-analytics-firebase`,
 /// or in twenty lines inside the app.
 let package = Package(
-    name: "swift-analytics",
+    name: "swift-app-analytics",
     platforms: [
         .iOS(.v17),
         .macOS(.v14),
