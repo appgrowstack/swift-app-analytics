@@ -16,6 +16,9 @@ tests, review, or the dashboard. The usual cause is not that a call was written 
 is that **the counting rule was written nowhere**, so nobody could call the second call site a
 mistake. This package puts the counting rule in the vocabulary.
 
+> Developed in a private monorepo and copied here one way. Issues are welcome; pull requests are
+> not accepted.
+
 ## Features
 
 - **The catalog owns the counting rule.** "Once per install" and "once it has been visible for a
