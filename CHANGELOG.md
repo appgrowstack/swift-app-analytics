@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-21
+
 ### Changed
 
 - The package `name` in `Package.swift` is now `swift-app-analytics`, the same as the repository. Apps already refer to it as `package: "swift-app-analytics"` (SwiftPM takes the identity from the URL); only the manifest name was left over from before the rename.
@@ -285,7 +287,6 @@ pin `.upToNextMinor(from: "0.1.0")` before it is published, then move deliberate
 - **BREAKING:** `DedupScope.episode`. It was handled exactly like `.always` and enforced nowhere;
   per-exposure counting is done by `trackScreen` / `trackImpression`. Catalogs that say
   `dedup: episode` fail to generate: use `always`, and regenerate
-
 
 Keep a Changelog format. Versions match their tags.
 

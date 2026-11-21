@@ -71,7 +71,7 @@ XcodeのProduct > Build Documentationで開けます。カタログのファイ�
 ## 入れ方
 
 ```swift
-.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.0"))
+.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.1"))
 ```
 
 ```swift

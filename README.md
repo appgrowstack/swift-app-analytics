@@ -90,7 +90,7 @@ catalog file format is [Schema/SCHEMA.md](./Schema/SCHEMA.md) (in Japanese), and
 ## Installation
 
 ```swift
-.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.0"))
+.package(url: "https://github.com/appgrowstack/swift-app-analytics.git", .upToNextMinor(from: "0.4.1"))
 ```
 
 ```swift
