@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
 ### Added
 
 - The common catalog (version 3) has the events the campaign SDKs make and hand to the app's analytics:
